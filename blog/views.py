@@ -1,21 +1,25 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.http import HttpResponse
 from django.shortcuts import render
-from blog.models import Category, Post, Author, Comments, User
+
+from blog.forms import AdForm
+from blog.models import Category, Post, Author, CustomUser, Comments, Ad
 
 
 def index(request):
     categories = Category.objects.all()
+    cat_list = []
+    for c in categories:
+        post = Post.objects.filter(category_id=c.id)
+        if post:
+            cat_list.append(c.id)
+    cat = categories.filter(id__in=cat_list)
     authors = Author.objects.all()
-    users = User.objects.all()
-    try:
-        category_fan = Category.objects.get(title='Фантастика')
-    except ObjectDoesNotExist:
-        raise ValueError('Такой категории не существует!')
-    return render(request, 'index.html', {'categories': categories, 'fan': category_fan, 'authors': authors})
+    users = CustomUser.objects.all()
 
-    params = {'categories': categories,
-              'fan': category_fan, 'authors': authors,
-              'users': users, 'comments': com}
+    params = {'categories': cat,
+     'authors': authors,
+              'users': users}
     return render(request, 'index.html', params)
 
 
@@ -27,15 +31,44 @@ def category(request, pk):
 def author(request, pk):
     posts = Post.objects.filter(author_id=pk)
     params = {'posts': posts}
-    return render(request, 'posts_by_author.html', params)
+    return render(request, 'posts_by_author.html', locals())
 
 
 def comments(request, pk):
+    categories = Category.objects.all()
+    cat_list = []
+    for c in categories:
+        post = Post.objects.filter(category_id=c.id)
+        if post:
+            cat_list.append(c.id)
+    cat = categories.filter(id__in=cat_list)
+    authors = Author.objects.all()
+    users = CustomUser.objects.all()
     _comments = Comments.objects.filter(user_id=pk)
-    return render(request, 'comments.html', {'comments': comments})
-    com_list = []
-    for c in comments():
-        us = User.objects.filter(comments_id=c.id)
-        if us:
-            com_list.append(c.id)
-    com = comments.filter(id__in=com_list)
+    return render(request, 'comments.html', locals())
+
+def create_ad(request):
+    if request.user.is_authenticated:
+        if request.method == 'POST':
+            form = AdForm(request.POST, request.FILES)
+            if form.is_valid():
+                cd = form.cleaned_data
+                Ad.objects.create(title=cd['title'], description=cd['description'], image=cd['image'], user=request.user)
+                return HttpResponse('Ad успешно создан!')
+        else:
+            form = AdForm()
+    else:
+        return HttpResponse('Вы не авторизованы')
+    return render(request, 'ad.html', {'form': form})
+
+def ad(request):
+    ads = Ad.objects.all()
+    rev_ads = reversed(ads)
+
+    return render(request, 'ads.html', locals())
+
+
+def ads(request, pk):
+    adverts = Ad.objects.filter(pk=pk)
+
+    return render(request, 'listads.html', locals())
